@@ -37,7 +37,7 @@ uv sync
 
 ```bash
 (プロジェクトルート)/
-  ├─ main.py
+  ├─ spectra_plot.py
   ├─ data/  <-- ここにテキストファイルを置く
   │   └─ sample1.txt
   │   └─ sample2.txt
@@ -47,10 +47,10 @@ uv sync
 ### 2. 実行
 
 ```bash
-uv run main.py
+uv run python spectra_plot.py
 ```
 
-このコマンドは、`main.py` を実行します。
+このコマンドは、`spectra_plot.py` を実行します。
 
 ### 3. 結果の確認
 
@@ -68,10 +68,10 @@ uv run main.py
 
 ## 設定の変更
 
-グラフのX軸範囲などを変更したい場合は、`main.py` の冒頭にある `Constants` セクションを直接編集してください。
+グラフのX軸範囲などを変更したい場合は、`spectra_plot.py` の冒頭にある `Constants` セクションを直接編集してください。
 
 ```python
-# main.py
+# spectra_plot.py
 
 # Constants
 DATA_DIR = Path("data")
@@ -84,9 +84,9 @@ MARGIN_RATIO = 0.05
 
 ---
 
-## ラマン分光解析 (`spectram_analysis.py`)
+## ラマン分光解析 (`spectra_analysis.py`)
 
-`main.py` が「可視化用」なのに対して、`spectram_analysis.py` はラマン分光データのピーク解析を行うスクリプトです。
+`spectra_plot.py` が「可視化用」なのに対して、`spectra_analysis.py` はラマン分光データのピーク解析を行うスクリプトです。
 
 ### 目的
 
@@ -100,7 +100,7 @@ MARGIN_RATIO = 0.05
 ### 実行方法
 
 ```bash
-uv run python spectram_analysis.py
+uv run python spectra_analysis.py
 ```
 
 ### 処理フロー
@@ -129,7 +129,7 @@ y(x) = A * exp(-(x - mu)^2 / (2*sigma^2)) + (m*x + b)
 
 ### 出力
 
-実行後に `output/spectram_analysis/` 以下を生成します。
+実行後に `output/spectra_analysis/` 以下を生成します。
 
 - `summary.csv`
   - ファイルごとの補正量、ピーク位置、正規化後ピーク強度、強度比、各フィットの `R^2`

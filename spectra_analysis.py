@@ -8,17 +8,17 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
 
+from spectra_common import PlotStyle, SpectrumDataStore
+
 # Paths
 DATA_DIR = Path("data")
-OUTPUT_DIR = Path("output") / "spectram_analysis"
+OUTPUT_DIR = Path("output") / "spectra_analysis"
 PLOT_DIR = OUTPUT_DIR / "plots"
 TABLE_DIR = OUTPUT_DIR / "tables"
 
 # Constants
-X_LABEL = "Raman shift (cm^-1)"
-Y_LABEL = "Intensity (a.u.)"
-DPI = 300
-FIGURE_SIZE = (12, 8)
+PLOT_STYLE = PlotStyle(figure_size=(12, 8), dpi=300, x_label="Raman shift (cm^-1)", y_label="Intensity (a.u.)")
+DATA_STORE = SpectrumDataStore(DATA_DIR)
 
 # Peak settings (cm^-1)
 SI_THEORETICAL_CENTER = 520.8
@@ -43,15 +43,6 @@ class PeakFitResult:
     @property
     def area(self) -> float:
         return self.amplitude * self.sigma * np.sqrt(2.0 * np.pi)
-
-
-def load_data(file_path: Path) -> pd.DataFrame:
-    try:
-        df = pd.read_csv(file_path, sep=r"\s+", header=None, names=["X", "Y"])
-        return df.dropna().sort_values("X").reset_index(drop=True)
-    except Exception as e:
-        logging.error("読み込みエラー %s: %s", file_path, e)
-        return pd.DataFrame(columns=["X", "Y"])
 
 
 def gaussian_with_linear_baseline(
@@ -177,7 +168,7 @@ def calculate_ratios(fits: Dict[str, PeakFitResult]) -> Dict[str, float]:
 
 
 def analyze_file(file_path: Path) -> Optional[Dict[str, float]]:
-    df = load_data(file_path)
+    df = DATA_STORE.load_txt(file_path)
     if df.empty:
         return None
 
@@ -219,12 +210,10 @@ def analyze_file(file_path: Path) -> Optional[Dict[str, float]]:
     ratios = calculate_ratios(peak_fits)
 
     # 保存: 補正+正規化データ
-    TABLE_DIR.mkdir(parents=True, exist_ok=True)
     out_table = TABLE_DIR / f"{file_path.stem}_corrected_normalized.csv"
-    df_normalized.to_csv(out_table, index=False)
+    DATA_STORE.save_dataframe(df_normalized, out_table, index=False)
 
     # 保存: 図
-    PLOT_DIR.mkdir(parents=True, exist_ok=True)
     plot_path = PLOT_DIR / f"{file_path.stem}_analysis.png"
     save_plot(file_path.stem, df, si_fit_raw, shift_cm1, df_normalized, peak_fits, plot_path)
 
@@ -261,7 +250,7 @@ def save_plot(
     peak_fits: Dict[str, PeakFitResult],
     save_path: Path,
 ) -> None:
-    fig, axes = plt.subplots(2, 1, figsize=FIGURE_SIZE, sharex=False)
+    fig, axes = plt.subplots(2, 1, figsize=PLOT_STYLE.figure_size, sharex=False)
 
     # 上段: 生データ + Siフィット
     ax1 = axes[0]
@@ -275,8 +264,8 @@ def save_plot(
     ax1.axvline(si_fit_raw.center, color="tab:red", linestyle="--", linewidth=1.0)
     ax1.axvline(SI_THEORETICAL_CENTER, color="tab:green", linestyle=":", linewidth=1.0)
     ax1.set_title(f"{title} | Raw and Si calibration")
-    ax1.set_xlabel(X_LABEL)
-    ax1.set_ylabel(Y_LABEL)
+    ax1.set_xlabel(PLOT_STYLE.x_label)
+    ax1.set_ylabel(PLOT_STYLE.y_label)
     ax1.grid(True, alpha=0.3)
     ax1.legend(loc="upper right")
     ax1.text(
@@ -309,21 +298,20 @@ def save_plot(
 
     ax2.set_xlim(1000, 3000)
     ax2.set_title(f"{title} | Graphene peak fitting")
-    ax2.set_xlabel(X_LABEL)
+    ax2.set_xlabel(PLOT_STYLE.x_label)
     ax2.set_ylabel("Normalized intensity (Si=1)")
     ax2.grid(True, alpha=0.3)
     ax2.legend(loc="upper right")
 
-    save_path.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
-    fig.savefig(save_path, dpi=DPI, bbox_inches="tight")
+    DATA_STORE.save_figure(fig, save_path, dpi=PLOT_STYLE.dpi)
     plt.close(fig)
 
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    input_files = sorted(DATA_DIR.glob("*.txt"))
+    input_files = DATA_STORE.list_input_files()
     if not input_files:
         logging.warning("%s に .txt ファイルが見つかりません", DATA_DIR)
         return
@@ -342,8 +330,7 @@ def main() -> None:
         return
 
     summary_path = OUTPUT_DIR / "summary.csv"
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(records).to_csv(summary_path, index=False)
+    DATA_STORE.save_dataframe(pd.DataFrame(records), summary_path, index=False)
     logging.info("完了: %s", summary_path)
 
 
