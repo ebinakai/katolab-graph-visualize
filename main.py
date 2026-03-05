@@ -7,7 +7,7 @@ from typing import Tuple, Optional
 # Constants
 DATA_DIR = Path("data")
 OUTPUT_DIR = Path("output")
-X_MIN = 500
+X_MIN = 1000
 X_MAX = 3000
 MARGIN_RATIO = 0.05
 DPI = 300

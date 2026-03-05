@@ -217,4 +217,4 @@ __marimo__/
 
 # custom ignore rules
 data/
-logs/
+output/

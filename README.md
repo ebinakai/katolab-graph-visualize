@@ -81,3 +81,70 @@ X_MAX = 3000 # グラフのX軸 最大値
 MARGIN_RATIO = 0.05
 # ...
 ```
+
+---
+
+## ラマン分光解析 (`spectram_analysis.py`)
+
+`main.py` が「可視化用」なのに対して、`spectram_analysis.py` はラマン分光データのピーク解析を行うスクリプトです。
+
+### 目的
+
+ラマンシフト（`cm^-1`）を用いて、以下を自動処理します。
+
+1. シリコン（Si）ピーク位置の理論値 `520.8 cm^-1` からのズレを算出し、X軸を補正
+2. 補正後Siピークの強度（振幅）を `1` に正規化
+3. ガウシアン + 一次ベースラインでピークフィッティング
+4. グラフェンの `D`, `G`, `2D` ピークの強度比を算出
+
+### 実行方法
+
+```bash
+uv run python spectram_analysis.py
+```
+
+### 処理フロー
+
+各 `data/*.txt` に対して次の順で解析します。
+
+1. データ読込（2列: `X`, `Y`）
+2. Si領域（`480-560 cm^-1`）をフィットして、理論値 `520.8` との差分 `shift` を取得
+3. `X_corrected = X + shift` で軸補正
+4. 補正後Siを再フィットし、その振幅 `A_Si` で `Y_normalized = Y / A_Si`
+5. `D(1250-1450)`, `G(1500-1650)`, `2D(2600-2800)` をフィット
+6. 強度比 `I_D/I_G`, `I_2D/I_G`, `I_D/I_2D` を計算
+
+### フィットモデル
+
+各ピークは以下でフィットします。
+
+```text
+y(x) = A * exp(-(x - mu)^2 / (2*sigma^2)) + (m*x + b)
+```
+
+- `A`: ピーク振幅（強度）
+- `mu`: ピーク中心
+- `sigma`: 幅
+- `m*x + b`: 一次ベースライン
+
+### 出力
+
+実行後に `output/spectram_analysis/` 以下を生成します。
+
+- `summary.csv`
+  - ファイルごとの補正量、ピーク位置、正規化後ピーク強度、強度比、各フィットの `R^2`
+- `tables/*_corrected_normalized.csv`
+  - 軸補正 + Si正規化済みスペクトル
+- `plots/*_analysis.png`
+  - 上段: 生データ + Siフィット（補正量表示）
+  - 下段: 補正・正規化データ + D/G/2Dフィット
+
+### 主なサマリ列 (`summary.csv`)
+
+- `si_center_raw_cm-1`: 補正前Si中心
+- `si_shift_correction_cm-1`: 適用した補正量（理論値との差）
+- `si_center_corrected_cm-1`: 補正後Si中心
+- `si_normalization_factor`: 正規化に使ったSi振幅
+- `D_amplitude_norm`, `G_amplitude_norm`, `2D_amplitude_norm`: 正規化後ピーク強度
+- `I_D/I_G`, `I_2D/I_G`, `I_D/I_2D`: 強度比
+- `R2_D`, `R2_G`, `R2_2D`: 各ピークフィットの決定係数
