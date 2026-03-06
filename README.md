@@ -54,12 +54,12 @@ uv run python spectra_plot.py
 
 ### 3. 結果の確認
 
-処理が完了すると、`output/data` ディレクトリにグラフの画像ファイル（`.png`）が生成されています。
+処理が完了すると、`output/spectra_plot` ディレクトリにグラフの画像ファイル（`.png`）が生成されています。
 
 ```bash
 (プロジェクトルート)/
   └─ output/
-      └─ data/
+      └─ spectra_plot/
           └─ sample1.png
           └─ sample2.png
 ```

@@ -8,7 +8,7 @@ from spectra_common import PlotStyle, SpectrumDataStore
 
 # Constants
 DATA_DIR = Path("data")
-OUTPUT_DIR = Path("output")
+OUTPUT_DIR = Path("output/spectra_plot")
 X_MIN = 1000
 X_MAX = 3000
 MARGIN_RATIO = 0.05
@@ -97,8 +97,8 @@ def main():
 
         y_min, y_max = y_range
         
-        # 保存パスを構築: output/data/filename.png
-        save_path = OUTPUT_DIR / file_path.parent.name / (file_path.stem + ".png")
+        # 保存パスを構築: output/spectra_plot/filename.png
+        save_path = OUTPUT_DIR / (file_path.stem + ".png")
         
         plot_graph(df, X_MIN, X_MAX, y_min, y_max, file_path.stem, save_path)
 
