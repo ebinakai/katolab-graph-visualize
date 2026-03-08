@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
 
-from spectra_common import PlotStyle, SpectrumDataStore
+from spectra_common import PlotStyle, SpectrumDataStore, prepare_input_files
 
 # Paths
 DATA_DIR = Path("data")
@@ -22,6 +22,8 @@ DATA_STORE = SpectrumDataStore(DATA_DIR)
 
 # Peak settings (cm^-1)
 SI_THEORETICAL_CENTER = 520.8
+ENABLE_SI_SHIFT = False
+MIN_X_WITHOUT_SI_SHIFT = 500.0
 PEAK_WINDOWS: Dict[str, Tuple[float, float]] = {
     "Si": (480.0, 560.0),
     "D": (1250.0, 1450.0),
@@ -167,35 +169,59 @@ def calculate_ratios(fits: Dict[str, PeakFitResult]) -> Dict[str, float]:
     }
 
 
-def analyze_file(file_path: Path) -> Optional[Dict[str, float]]:
+def analyze_file(file_path: Path, enable_si_shift: bool = ENABLE_SI_SHIFT) -> Optional[Dict[str, float]]:
     df = DATA_STORE.load_txt(file_path)
     if df.empty:
         return None
 
-    # 1) Siピークで軸シフト補正
-    si_fit_raw = fit_peak(df, "Si(raw)", PEAK_WINDOWS["Si"])
-    if si_fit_raw is None:
-        logging.warning("%s: Siピークが取得できないためスキップ", file_path.name)
-        return None
+    si_fit_raw: Optional[PeakFitResult] = None
+    si_fit_corrected: Optional[PeakFitResult] = None
+    shift_cm1 = 0.0
+    normalization_factor = 1.0
 
-    shift_cm1 = SI_THEORETICAL_CENTER - si_fit_raw.center
-    df_corrected = df.copy()
-    df_corrected["X"] = df_corrected["X"] + shift_cm1
+    if enable_si_shift:
+        # 1) Siピークで軸シフト補正
+        si_fit_raw = fit_peak(df, "Si(raw)", PEAK_WINDOWS["Si"])
+        if si_fit_raw is None:
+            logging.warning("%s: Siピークが取得できないためスキップ", file_path.name)
+            return None
 
-    # 2) 補正後Siピークの振幅で正規化
-    si_fit_corrected = fit_peak(
-        df_corrected,
-        "Si(corrected)",
-        PEAK_WINDOWS["Si"],
-        center_bounds=(SI_THEORETICAL_CENTER - 8.0, SI_THEORETICAL_CENTER + 8.0),
-    )
-    if si_fit_corrected is None or si_fit_corrected.amplitude <= 0:
-        logging.warning("%s: 正規化用Siピークが取得できないためスキップ", file_path.name)
-        return None
+        shift_cm1 = SI_THEORETICAL_CENTER - si_fit_raw.center
+        df_corrected = df.copy()
+        df_corrected["X"] = df_corrected["X"] + shift_cm1
 
-    normalization_factor = si_fit_corrected.amplitude
-    df_normalized = df_corrected.copy()
-    df_normalized["Y"] = df_normalized["Y"] / normalization_factor
+        # 2) 補正後Siピークの振幅で正規化
+        si_fit_corrected = fit_peak(
+            df_corrected,
+            "Si(corrected)",
+            PEAK_WINDOWS["Si"],
+            center_bounds=(SI_THEORETICAL_CENTER - 8.0, SI_THEORETICAL_CENTER + 8.0),
+        )
+        if si_fit_corrected is None or si_fit_corrected.amplitude <= 0:
+            logging.warning("%s: 正規化用Siピークが取得できないためスキップ", file_path.name)
+            return None
+
+        normalization_factor = si_fit_corrected.amplitude
+        df_normalized = df_corrected.copy()
+        df_normalized["Y"] = df_normalized["Y"] / normalization_factor
+    else:
+        # Si補正なし: 低波数域を除外してから最大値で正規化
+        df_filtered = df.loc[df["X"] > MIN_X_WITHOUT_SI_SHIFT].copy()
+        if df_filtered.empty:
+            logging.warning(
+                "%s: X > %.1f cm^-1 のデータがないためスキップ",
+                file_path.name,
+                MIN_X_WITHOUT_SI_SHIFT,
+            )
+            return None
+
+        normalization_scale = float(df_filtered["Y"].abs().max())
+        if normalization_scale <= 0:
+            logging.warning("%s: 正規化スケールが0のためスキップ", file_path.name)
+            return None
+
+        df_normalized = df_filtered.copy()
+        df_normalized["Y"] = df_normalized["Y"] / normalization_scale
 
     # 3) D/G/2Dをガウシアン+一次ベースラインでフィット
     peak_fits: Dict[str, PeakFitResult] = {}
@@ -215,14 +241,25 @@ def analyze_file(file_path: Path) -> Optional[Dict[str, float]]:
 
     # 保存: 図
     plot_path = PLOT_DIR / f"{file_path.stem}_analysis.png"
-    save_plot(file_path.stem, df, si_fit_raw, shift_cm1, df_normalized, peak_fits, plot_path)
+    save_plot(
+        file_path.stem,
+        df,
+        si_fit_raw,
+        shift_cm1,
+        df_normalized,
+        peak_fits,
+        plot_path,
+        si_shift_enabled=enable_si_shift,
+    )
 
     result = {
         "file": file_path.name,
-        "si_center_raw_cm-1": si_fit_raw.center,
+        "si_shift_enabled": enable_si_shift,
+        "si_center_raw_cm-1": si_fit_raw.center if si_fit_raw is not None else np.nan,
         "si_shift_correction_cm-1": shift_cm1,
-        "si_center_corrected_cm-1": si_fit_corrected.center,
-        "si_normalization_factor": normalization_factor,
+        "si_center_corrected_cm-1": si_fit_corrected.center if si_fit_corrected is not None else np.nan,
+        "si_normalization_factor": normalization_factor if si_fit_corrected is not None else np.nan,
+        "x_filter_min_cm-1": np.nan if enable_si_shift else MIN_X_WITHOUT_SI_SHIFT,
         "D_center_cm-1": peak_fits["D"].center,
         "G_center_cm-1": peak_fits["G"].center,
         "2D_center_cm-1": peak_fits["2D"].center,
@@ -244,11 +281,12 @@ def analyze_file(file_path: Path) -> Optional[Dict[str, float]]:
 def save_plot(
     title: str,
     df_raw: pd.DataFrame,
-    si_fit_raw: PeakFitResult,
+    si_fit_raw: Optional[PeakFitResult],
     shift_cm1: float,
     df_normalized: pd.DataFrame,
     peak_fits: Dict[str, PeakFitResult],
     save_path: Path,
+    si_shift_enabled: bool,
 ) -> None:
     fig, axes = plt.subplots(2, 1, figsize=PLOT_STYLE.figure_size, sharex=False)
 
@@ -256,14 +294,19 @@ def save_plot(
     ax1 = axes[0]
     ax1.plot(df_raw["X"], df_raw["Y"], color="tab:blue", linewidth=1.0, label="Raw")
 
-    si_window = PEAK_WINDOWS["Si"]
-    x_si = np.linspace(si_window[0], si_window[1], 400)
-    y_si = build_fitted_curve(x_si, si_fit_raw)
-    ax1.plot(x_si, y_si, color="tab:red", linewidth=1.5, label="Si fit")
+    if si_shift_enabled and si_fit_raw is not None:
+        si_window = PEAK_WINDOWS["Si"]
+        x_si = np.linspace(si_window[0], si_window[1], 400)
+        y_si = build_fitted_curve(x_si, si_fit_raw)
+        ax1.plot(x_si, y_si, color="tab:red", linewidth=1.5, label="Si fit")
+        ax1.axvline(si_fit_raw.center, color="tab:red", linestyle="--", linewidth=1.0)
+        ax1.axvline(SI_THEORETICAL_CENTER, color="tab:green", linestyle=":", linewidth=1.0)
+        si_text = f"Si raw center={si_fit_raw.center:.3f} cm^-1\nShift correction={shift_cm1:+.3f} cm^-1"
+        ax1.set_title(f"{title} | Raw and Si calibration")
+    else:
+        si_text = "Si calibration skipped"
+        ax1.set_title(f"{title} | Raw (Si calibration OFF)")
 
-    ax1.axvline(si_fit_raw.center, color="tab:red", linestyle="--", linewidth=1.0)
-    ax1.axvline(SI_THEORETICAL_CENTER, color="tab:green", linestyle=":", linewidth=1.0)
-    ax1.set_title(f"{title} | Raw and Si calibration")
     ax1.set_xlabel(PLOT_STYLE.x_label)
     ax1.set_ylabel(PLOT_STYLE.y_label)
     ax1.grid(True, alpha=0.3)
@@ -271,7 +314,7 @@ def save_plot(
     ax1.text(
         0.02,
         0.95,
-        f"Si raw center={si_fit_raw.center:.3f} cm^-1\nShift correction={shift_cm1:+.3f} cm^-1",
+        si_text,
         transform=ax1.transAxes,
         va="top",
         fontsize=9,
@@ -285,7 +328,7 @@ def save_plot(
         df_normalized["Y"],
         color="tab:blue",
         linewidth=1.0,
-        label="Corrected + Si-normalized",
+        label="Corrected + Si-normalized" if si_shift_enabled else "X>500 filtered + max-normalized",
     )
 
     color_map = {"D": "tab:orange", "G": "tab:green", "2D": "tab:purple"}
@@ -299,7 +342,7 @@ def save_plot(
     ax2.set_xlim(1000, 3000)
     ax2.set_title(f"{title} | Graphene peak fitting")
     ax2.set_xlabel(PLOT_STYLE.x_label)
-    ax2.set_ylabel("Normalized intensity (Si=1)")
+    ax2.set_ylabel("Normalized intensity (Si=1)" if si_shift_enabled else "Normalized intensity (max=1)")
     ax2.grid(True, alpha=0.3)
     ax2.legend(loc="upper right")
 
@@ -309,28 +352,25 @@ def save_plot(
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-
-    input_files = DATA_STORE.list_input_files()
+    input_files = prepare_input_files(DATA_STORE, DATA_DIR)
     if not input_files:
-        logging.warning("%s に .txt ファイルが見つかりません", DATA_DIR)
         return
 
-    logging.info("%d 個のファイルを解析します", len(input_files))
+    logging.info("Siシフト補正: %s", "ON" if ENABLE_SI_SHIFT else "OFF")
 
     records = []
     for file_path in input_files:
         logging.info("処理中: %s", file_path.name)
-        result = analyze_file(file_path)
+        result = analyze_file(file_path, enable_si_shift=ENABLE_SI_SHIFT)
         if result is not None:
             records.append(result)
 
-    if not records:
-        logging.warning("有効な解析結果がありませんでした")
-        return
-
     summary_path = OUTPUT_DIR / "summary.csv"
     DATA_STORE.save_dataframe(pd.DataFrame(records), summary_path, index=False)
+    if not records:
+        logging.warning("有効な解析結果がありませんでした。空のサマリーを保存しました: %s", summary_path)
+        return
+
     logging.info("完了: %s", summary_path)
 
 

@@ -148,3 +148,8 @@ y(x) = A * exp(-(x - mu)^2 / (2*sigma^2)) + (m*x + b)
 - `D_amplitude_norm`, `G_amplitude_norm`, `2D_amplitude_norm`: 正規化後ピーク強度
 - `I_D/I_G`, `I_2D/I_G`, `I_D/I_2D`: 強度比
 - `R2_D`, `R2_G`, `R2_2D`: 各ピークフィットの決定係数
+
+## 今後
+
+- [] ローレンツでフィッティング
+- [] ガウス + ローレンツ の組み合わせ

@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import Tuple, Optional
 
-from spectra_common import PlotStyle, SpectrumDataStore
+from spectra_common import PlotStyle, SpectrumDataStore, prepare_input_files
 
 # Constants
 DATA_DIR = Path("data")
@@ -74,16 +74,9 @@ def plot_graph(
         plt.close(fig)
 
 def main():
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-
-    # pathlib を使ってファイルを見つける
-    input_files = DATA_STORE.list_input_files()
-    
+    input_files = prepare_input_files(DATA_STORE, DATA_DIR)
     if not input_files:
-        logging.warning(f"{DATA_DIR} に .txt ファイルが見つかりませんでした")
         return
-
-    logging.info(f"{len(input_files)} 個のファイルが見つかりました。処理を開始します...")
 
     for file_path in input_files:
         df = DATA_STORE.load_txt(file_path)
@@ -97,8 +90,9 @@ def main():
 
         y_min, y_max = y_range
         
-        # 保存パスを構築: output/spectra_plot/filename.png
-        save_path = OUTPUT_DIR / (file_path.stem + ".png")
+        # 保存パスを構築: output/spectra_plot/<data配下の相対パス>.png
+        relative_path = file_path.relative_to(DATA_DIR).with_suffix(".png")
+        save_path = OUTPUT_DIR / relative_path
         
         plot_graph(df, X_MIN, X_MAX, y_min, y_max, file_path.stem, save_path)
 
