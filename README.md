@@ -2,154 +2,121 @@
 
 ## 概要
 
-実験・測定で得られた数値データ（テキストファイル）から、自動でグラフを作成し画像として保存するPythonスクリプトです。
-
-特に、分光データのように  **「特定の範囲だけを拡大して見たいが、範囲外のノイズや外れ値のせいでY軸のスケールが潰れてしまう」**  という問題を解決するために開発されました。
-
-指定したX軸の範囲に基づいてY軸を自動で最適化し、見やすいグラフを生成します。
+実験・測定で得られた数値データ（テキストファイル）から、ラマン分光スペクトルのグラフ作成・ピーク解析を自動化する Python スクリプト群です。
 
 ---
 
-## 使い方 (uv ネイティブワークフロー)
+## モジュール構成
 
-本プロジェクトは、高速なPythonパッケージ管理ツール [uv](https://github.com/astral-sh/uv) のネイティブな利用を前提としています。
+| ファイル | 役割 |
+| --- | --- |
+| `spectra_common.py` | I/O ユーティリティ（`SpectrumDataStore`・`PlotStyle`） |
+| `spectra_peak_fit.py` | フィッティングモデルとアルゴリズム |
+| `spectra_analysis.py` | ラマン分光データの解析オーケストレーション・エントリポイント |
+| `spectra_plot.py` | 汎用スペクトル可視化スクリプト |
 
-### 1. 準備
+---
 
-**a. 仮想環境の作成と有効化**  
-
-```bash
-# 仮想環境を作成
-uv venv
-
-source .venv/bin/activate
-```
-
-**b. 依存パッケージのインストール**
-`pyproject.toml` と `uv.lock` ファイルから依存関係をインストールします。
+## セットアップ
 
 ```bash
 uv sync
 ```
 
-**c. 解析したいデータの配置**
-`data` ディレクトリを作成し、その中に解析対象のテキストファイル（`.txt`）を配置してください。
+`data/` ディレクトリを作成し、解析対象の `.txt` ファイルを配置してください（2列: X, Y）。
 
 ```bash
 (プロジェクトルート)/
-  ├─ spectra_plot.py
-  ├─ data/  <-- ここにテキストファイルを置く
-  │   └─ sample1.txt
+  ├─ data/
+  │   ├─ sample1.txt
   │   └─ sample2.txt
   └─ ...
 ```
 
-### 2. 実行
+---
+
+## 実行
 
 ```bash
-uv run python spectra_plot.py
-```
-
-このコマンドは、`spectra_plot.py` を実行します。
-
-### 3. 結果の確認
-
-処理が完了すると、`output/spectra_plot` ディレクトリにグラフの画像ファイル（`.png`）が生成されています。
-
-```bash
-(プロジェクトルート)/
-  └─ output/
-      └─ spectra_plot/
-          └─ sample1.png
-          └─ sample2.png
+uv run analyze   # ラマン分光解析
+uv run plot      # 汎用スペクトルプロット
 ```
 
 ---
 
-## 設定の変更
-
-グラフのX軸範囲などを変更したい場合は、`spectra_plot.py` の冒頭にある `Constants` セクションを直接編集してください。
-
-```python
-# spectra_plot.py
-
-# Constants
-DATA_DIR = Path("data")
-OUTPUT_DIR = Path("output")
-X_MIN = 500  # グラフのX軸 最小値
-X_MAX = 3000 # グラフのX軸 最大値
-MARGIN_RATIO = 0.05
-# ...
-```
-
----
-
-## ラマン分光解析 (`spectra_analysis.py`)
-
-`spectra_plot.py` が「可視化用」なのに対して、`spectra_analysis.py` はラマン分光データのピーク解析を行うスクリプトです。
-
-### 目的
-
-ラマンシフト（`cm^-1`）を用いて、以下を自動処理します。
-
-1. シリコン（Si）ピーク位置の理論値 `520.8 cm^-1` からのズレを算出し、X軸を補正
-2. 補正後Siピークの強度（振幅）を `1` に正規化
-3. ガウシアン + 一次ベースラインでピークフィッティング
-4. グラフェンの `D`, `G`, `2D` ピークの強度比を算出
-
-### 実行方法
-
-```bash
-uv run python spectra_analysis.py
-```
+## `analyze` — ラマン分光解析
 
 ### 処理フロー
 
-各 `data/*.txt` に対して次の順で解析します。
+各 `data/**/*.txt` に対して以下を実行します。
 
-1. データ読込（2列: `X`, `Y`）
-2. Si領域（`480-560 cm^-1`）をフィットして、理論値 `520.8` との差分 `shift` を取得
-3. `X_corrected = X + shift` で軸補正
-4. 補正後Siを再フィットし、その振幅 `A_Si` で `Y_normalized = Y / A_Si`
-5. `D(1250-1450)`, `G(1500-1650)`, `2D(2600-2800)` をフィット
-6. 強度比 `I_D/I_G`, `I_2D/I_G`, `I_D/I_2D` を計算
+1. データ読込（2列: `X` cm⁻¹, `Y` 強度）
+2. **Si シフト補正**（`ENABLE_SI_SHIFT = True` のとき）  
+   Si ピーク（`480–560 cm⁻¹`）をフィットし、理論値 `520.8 cm⁻¹` との差分で X 軸を補正  
+   → 補正後 Si ピーク振幅を `1` に正規化
+3. **Si 補正なし**（`ENABLE_SI_SHIFT = False` のとき）  
+   `X > 500 cm⁻¹` の範囲を最大値で正規化
+4. `D`・`G`・`2D` ピークをフィット
+5. 強度比 `I_D/I_G`・`I_2D/I_G`・`I_D/I_2D` を計算
 
-### フィットモデル
+### フィッティングモデル
 
-各ピークは以下でフィットします。
+`spectra_analysis.py` 冒頭の `FIT_METHOD` で手法を切り替えられます。
 
-```text
-y(x) = A * exp(-(x - mu)^2 / (2*sigma^2)) + (m*x + b)
+```python
+FIT_METHOD = FitMethod.GAUSSIAN      # ガウスフィッティング（デフォルト）
+FIT_METHOD = FitMethod.LORENTZIAN    # ローレンツフィッティング
 ```
 
-- `A`: ピーク振幅（強度）
-- `mu`: ピーク中心
-- `sigma`: 幅
-- `m*x + b`: 一次ベースライン
+| 手法 | 関数 | ピーク面積 |
+| --- | --- | --- |
+| Gaussian | `A·exp(-(x-μ)²/(2σ²)) + m·x + b` | `A·σ·√(2π)` |
+| Lorentzian | `A·γ²/((x-μ)²+γ²) + m·x + b` | `A·γ·π` |
+
+### ピーク窓（cm⁻¹）
+
+| ピーク | 範囲 |
+| --- | --- |
+| Si | 480–560 |
+| D | 1250–1450 |
+| G | 1500–1650 |
+| 2D | 2600–2800 |
 
 ### 出力
 
-実行後に `output/spectra_analysis/` 以下を生成します。
+`output/spectra_analysis/` 以下に生成されます。
 
-- `summary.csv`
-  - ファイルごとの補正量、ピーク位置、正規化後ピーク強度、強度比、各フィットの `R^2`
-- `tables/*_corrected_normalized.csv`
-  - 軸補正 + Si正規化済みスペクトル
-- `plots/*_analysis.png`
-  - 上段: 生データ + Siフィット（補正量表示）
-  - 下段: 補正・正規化データ + D/G/2Dフィット
+```bash
+output/spectra_analysis/
+  ├─ summary.csv                        # 全ファイルの解析結果一覧
+  ├─ tables/*_corrected_normalized.csv  # 補正・正規化済みスペクトル
+  └─ plots/*_analysis.png               # 解析グラフ（2段）
+```
 
-### 主なサマリ列 (`summary.csv`)
+#### `summary.csv` の主な列
 
-- `si_center_raw_cm-1`: 補正前Si中心
-- `si_shift_correction_cm-1`: 適用した補正量（理論値との差）
-- `si_center_corrected_cm-1`: 補正後Si中心
-- `si_normalization_factor`: 正規化に使ったSi振幅
-- `D_amplitude_norm`, `G_amplitude_norm`, `2D_amplitude_norm`: 正規化後ピーク強度
-- `I_D/I_G`, `I_2D/I_G`, `I_D/I_2D`: 強度比
-- `R2_D`, `R2_G`, `R2_2D`: 各ピークフィットの決定係数
+| 列名 | 内容 |
+| --- | --- |
+| `fit_method` | 使用したフィッティング手法 |
+| `si_shift_enabled` | Si シフト補正の有無 |
+| `si_center_raw_cm-1` | 補正前 Si ピーク中心 |
+| `si_shift_correction_cm-1` | 適用した補正量 |
+| `D_amplitude_norm` / `G_amplitude_norm` / `2D_amplitude_norm` | 正規化後ピーク振幅 |
+| `I_D/I_G` / `I_2D/I_G` / `I_D/I_2D` | 強度比 |
+| `R2_D` / `R2_G` / `R2_2D` | 各フィットの決定係数 R² |
 
-## 今後
+---
 
-- [] ローレンツでフィッティング
-- [] ガウス + ローレンツ の組み合わせ
+## `plot` — 汎用スペクトルプロット
+
+各スペクトルを 1 枚の PNG として保存するシンプルなプロッタです。  
+フィッティングは行いません。
+
+`spectra_plot.py` 冒頭の定数で表示範囲を変更できます。
+
+```python
+X_MIN = 1000   # X 軸最小値 (cm⁻¹)
+X_MAX = 3000   # X 軸最大値 (cm⁻¹)
+```
+
+出力先: `output/spectra_plot/`

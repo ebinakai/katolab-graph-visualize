@@ -10,3 +10,13 @@ dependencies = [
     "pandas>=2.3.3",
     "scipy>=1.13.1",
 ]
+
+[project.scripts]
+analyze = "spectra_analysis:main"
+plot    = "spectra_plot:main"
+
+[tool.uv]
+package = true
+
+[tool.setuptools]
+py-modules = ["spectra_analysis", "spectra_peak_fit", "spectra_plot", "spectra_common"]
