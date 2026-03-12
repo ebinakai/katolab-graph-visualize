@@ -68,11 +68,12 @@ COMPACT_SUMMARY_COLUMNS = [
     "R2_2D",
 ]
 LONG_SUMMARY_RATIO_COLUMNS = ["I_D/I_G", "I_2D/I_G"]
-LONG_SUMMARY_ID_COLUMNS = ["growth_time_hour", "file", "sample", "measurement_id"]
+LONG_SUMMARY_ID_COLUMNS = ["file", "sample", "measurement_id"]
 ENABLE_BASELINE_CORRECTION = True
 BASELINE_ASLS_LAMBDA = 1.0e6
 BASELINE_ASLS_P = 0.01
 BASELINE_ASLS_ITER = 10
+LABEL_COLUMN_PREFIX = "label_"
 
 
 def calculate_ratios(fits: Dict[str, PeakFitResult]) -> Dict[str, float]:
@@ -121,19 +122,6 @@ def baseline_correct_asls(
     return np.maximum(corrected, 0.0)
 
 
-def parse_growth_time_hour(file_path: Path) -> float:
-    path_text = str(file_path)
-    growth_match = re.search(r"growth_(\d+(?:\.\d+)?)h", path_text, flags=re.IGNORECASE)
-    if growth_match:
-        return float(growth_match.group(1))
-
-    generic_match = re.search(r"(\d+(?:\.\d+)?)h", path_text, flags=re.IGNORECASE)
-    if generic_match:
-        return float(generic_match.group(1))
-
-    return np.nan
-
-
 def parse_measurement_id(file_name: str) -> float:
     stem = Path(file_name).stem
     match = re.search(r"_(\d+)$", stem)
@@ -147,8 +135,45 @@ def parse_sample_name(file_name: str) -> str:
     return re.sub(r"_\d+$", "", stem)
 
 
+def normalize_label_key(label: str) -> str:
+    normalized = re.sub(r"[^0-9A-Za-z]+", "_", label).strip("_").lower()
+    return normalized
+
+
+def coerce_label_value(raw_value: str) -> Optional[float]:
+    match = re.search(r"\d+(?:\.\d+)?", raw_value)
+    if not match:
+        return None
+    return float(match.group(0))
+
+
+def parse_filename_labels(file_name: str) -> Dict[str, object]:
+    stem = Path(file_name).stem
+    tokens = re.split(r"[_\s]+", stem)
+    labels: Dict[str, object] = {}
+
+    for token in tokens:
+        match = re.fullmatch(r"([A-Za-z][A-Za-z0-9]*)-([A-Za-z0-9.]+)", token)
+        if not match:
+            continue
+
+        label_name = normalize_label_key(match.group(1))
+        if not label_name:
+            continue
+
+        column_name = f"{LABEL_COLUMN_PREFIX}{label_name}"
+        label_value = coerce_label_value(match.group(2))
+        if label_value is None:
+            continue
+        labels[column_name] = label_value
+
+    return labels
+
+
 def build_long_summary(summary_full_df: pd.DataFrame) -> pd.DataFrame:
+    dynamic_label_columns = sorted(col for col in summary_full_df.columns if col.startswith(LABEL_COLUMN_PREFIX))
     id_columns = [col for col in LONG_SUMMARY_ID_COLUMNS if col in summary_full_df.columns]
+    id_columns.extend(col for col in dynamic_label_columns if col not in id_columns)
     ratio_columns = [col for col in LONG_SUMMARY_RATIO_COLUMNS if col in summary_full_df.columns]
     if not ratio_columns:
         return pd.DataFrame(columns=id_columns + ["ratio_type", "value"])
@@ -174,9 +199,9 @@ def analyze_file(
     si_fit_corrected: Optional[PeakFitResult] = None
     shift_cm1 = 0.0
     normalization_factor = 1.0
-    growth_time_hour = parse_growth_time_hour(file_path)
     measurement_id = parse_measurement_id(file_path.name)
     sample_name = parse_sample_name(file_path.name)
+    filename_labels = parse_filename_labels(file_path.name)
 
     if enable_si_shift:
         # 1) Siピークで軸シフト補正
@@ -284,11 +309,12 @@ def analyze_file(
     }
 
     # 保存: 補正+正規化データ
-    out_table = TABLE_DIR / f"{file_path.stem}_corrected_normalized.csv"
+    relative_parent = file_path.relative_to(DATA_DIR).parent
+    out_table = TABLE_DIR / relative_parent / f"{file_path.stem}_corrected_normalized.csv"
     DATA_STORE.save_dataframe(df_normalized, out_table, index=False)
 
     # 保存: 図
-    plot_path = PLOT_DIR / f"{file_path.stem}_analysis.png"
+    plot_path = PLOT_DIR / relative_parent / f"{file_path.stem}_analysis.png"
     save_plot(
         file_path.stem,
         df,
@@ -302,9 +328,9 @@ def analyze_file(
 
     result = {
         "file": file_path.name,
+        "relative_path": str(file_path.relative_to(DATA_DIR)),
         "sample": sample_name,
         "measurement_id": measurement_id,
-        "growth_time_hour": growth_time_hour,
         "fit_method": fit_method.value,
         "si_shift_enabled": enable_si_shift,
         "baseline_correction_enabled": ENABLE_BASELINE_CORRECTION,
@@ -334,6 +360,7 @@ def analyze_file(
         "normalized_csv": str(out_table),
         "analysis_plot": str(plot_path),
     }
+    result.update(filename_labels)
     return result
 
 

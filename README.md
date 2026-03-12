@@ -89,14 +89,16 @@ FIT_METHOD = FitMethod.LORENTZIAN    # ローレンツフィッティング
 ```bash
 output/spectra_analysis/
   ├─ summary.csv                        # 全ファイルの解析結果一覧
-  ├─ tables/*_corrected_normalized.csv  # 補正・正規化済みスペクトル
-  └─ plots/*_analysis.png               # 解析グラフ（2段）
+  ├─ tables/.../*_corrected_normalized.csv  # 入力フォルダ構造を維持して保存
+  └─ plots/.../*_analysis.png               # 入力フォルダ構造を維持して保存
 ```
 
 #### `summary.csv` の主な列
 
 | 列名 | 内容 |
 | --- | --- |
+| `relative_path` | `data/` 配下の相対パス |
+| `label_xxx` | ファイル名中の `XXX-YYY` 形式を抽出した動的列。値は数値部分のみ保持。例: `anneal-1h` → `label_anneal=1`, `position-645mm` → `label_position=645` |
 | `fit_method` | 使用したフィッティング手法 |
 | `si_shift_enabled` | Si シフト補正の有無 |
 | `si_center_raw_cm-1` | 補正前 Si ピーク中心 |

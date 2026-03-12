@@ -218,3 +218,4 @@ __marimo__/
 # custom ignore rules
 data/
 output/
+*_bk/
