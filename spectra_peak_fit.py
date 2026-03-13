@@ -72,14 +72,15 @@ def fit_peak(
     center_bounds: Optional[Tuple[float, float]] = None,
     width_bounds: Optional[Tuple[float, float]] = None,
     center_edge_margin: float = 0.0,
+    min_points: int = 6,
     method: FitMethod = FitMethod.GAUSSIAN,
 ) -> Optional[PeakFitResult]:
     x_min, x_max = window
     mask = (df["X"] >= x_min) & (df["X"] <= x_max)
     sub = df.loc[mask]
 
-    if len(sub) < 8:
-        logging.warning("%s フィット失敗: データ点不足", peak_name)
+    if len(sub) < min_points:
+        logging.warning("%s フィット失敗: データ点不足 (%d < %d)", peak_name, len(sub), min_points)
         return None
 
     x = sub["X"].to_numpy(dtype=float)

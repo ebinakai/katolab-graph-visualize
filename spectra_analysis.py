@@ -26,10 +26,10 @@ DATA_STORE = SpectrumDataStore(DATA_DIR)
 
 # Peak settings (cm^-1)
 SI_THEORETICAL_CENTER = 520.8
-ENABLE_SI_SHIFT = False
+ENABLE_SI_SHIFT = True
 MIN_X_WITHOUT_SI_SHIFT = 500.0
 PEAK_WINDOWS: Dict[str, Tuple[float, float]] = {
-    "Si": (480.0, 560.0),
+    "Si": (460.0, 580.0),
     "D": (1270.0, 1450.0),
     "G": (1500.0, 1650.0),
     "2D": (2600.0, 2800.0),
@@ -68,7 +68,7 @@ COMPACT_SUMMARY_COLUMNS = [
     "R2_2D",
 ]
 LONG_SUMMARY_RATIO_COLUMNS = ["I_D/I_G", "I_2D/I_G"]
-LONG_SUMMARY_ID_COLUMNS = ["file", "sample", "measurement_id"]
+LONG_SUMMARY_ID_COLUMNS = ["growth_time_hour", "file", "sample", "measurement_id"]
 ENABLE_BASELINE_CORRECTION = True
 BASELINE_ASLS_LAMBDA = 1.0e6
 BASELINE_ASLS_P = 0.01
@@ -108,7 +108,7 @@ def baseline_correct_asls(
         return y.copy()
 
     n = y.size
-    d = sparse.diags([1.0, -2.0, 1.0], [0, 1, 2], shape=(n - 2, n), format="csc")
+    d = sparse.csc_matrix(np.diff(np.eye(n, dtype=float), n=2, axis=0))
     w = np.ones(n, dtype=float)
 
     baseline = np.zeros(n, dtype=float)
@@ -202,6 +202,8 @@ def analyze_file(
     measurement_id = parse_measurement_id(file_path.name)
     sample_name = parse_sample_name(file_path.name)
     filename_labels = parse_filename_labels(file_path.name)
+    growth_value = filename_labels.get("label_growth")
+    growth_time_hour = float(growth_value) if isinstance(growth_value, (int, float)) else np.nan
 
     if enable_si_shift:
         # 1) Siピークで軸シフト補正
@@ -331,6 +333,7 @@ def analyze_file(
         "relative_path": str(file_path.relative_to(DATA_DIR)),
         "sample": sample_name,
         "measurement_id": measurement_id,
+        "growth_time_hour": growth_time_hour,
         "fit_method": fit_method.value,
         "si_shift_enabled": enable_si_shift,
         "baseline_correction_enabled": ENABLE_BASELINE_CORRECTION,
