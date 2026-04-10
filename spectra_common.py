@@ -18,8 +18,12 @@ class SpectrumDataStore:
     def __init__(self, data_dir: Path):
         self.data_dir = data_dir
 
-    def list_input_files(self, pattern: str = "*.txt", recursive: bool = True) -> List[Path]:
-        paths = self.data_dir.rglob(pattern) if recursive else self.data_dir.glob(pattern)
+    def list_input_files(
+        self, pattern: str = "*.txt", recursive: bool = True
+    ) -> List[Path]:
+        paths = (
+            self.data_dir.rglob(pattern) if recursive else self.data_dir.glob(pattern)
+        )
         return sorted(path for path in paths if path.is_file())
 
     @staticmethod
@@ -45,7 +49,9 @@ class SpectrumDataStore:
         fig.savefig(save_path, dpi=dpi, bbox_inches=bbox_inches)
 
 
-def prepare_input_files(data_store: SpectrumDataStore, data_dir: Path, pattern: str = "*.txt") -> List[Path]:
+def prepare_input_files(
+    data_store: SpectrumDataStore, data_dir: Path, pattern: str = "*.txt"
+) -> List[Path]:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     input_files = data_store.list_input_files(pattern=pattern, recursive=True)
 
@@ -53,5 +59,7 @@ def prepare_input_files(data_store: SpectrumDataStore, data_dir: Path, pattern: 
         logging.warning("%s に .txt ファイルが見つかりませんでした", data_dir)
         return []
 
-    logging.info("%d 個のファイルが見つかりました。処理を開始します...", len(input_files))
+    logging.info(
+        "%d 個のファイルが見つかりました。処理を開始します...", len(input_files)
+    )
     return input_files

@@ -19,7 +19,12 @@ PLOT_DIR = OUTPUT_DIR / "plots"
 TABLE_DIR = OUTPUT_DIR / "tables"
 
 # Constants
-PLOT_STYLE = PlotStyle(figure_size=(12, 8), dpi=300, x_label="Raman shift (cm^-1)", y_label="Intensity (a.u.)")
+PLOT_STYLE = PlotStyle(
+    figure_size=(12, 8),
+    dpi=300,
+    x_label="Raman shift (cm^-1)",
+    y_label="Intensity (a.u.)",
+)
 
 FIT_METHOD = FitMethod.GAUSSIAN
 DATA_STORE = SpectrumDataStore(DATA_DIR)
@@ -88,7 +93,9 @@ def calculate_ratios(fits: Dict[str, PeakFitResult]) -> Dict[str, float]:
     }
 
 
-def is_center_near_bound(center: float, bounds: Tuple[float, float], tolerance: float) -> bool:
+def is_center_near_bound(
+    center: float, bounds: Tuple[float, float], tolerance: float
+) -> bool:
     return center <= bounds[0] + tolerance or center >= bounds[1] - tolerance
 
 
@@ -140,10 +147,10 @@ def normalize_label_key(label: str) -> str:
     return normalized
 
 
-def coerce_label_value(raw_value: str) -> Optional[float]:
+def coerce_label_value(raw_value: str) -> Optional[float | str]:
     match = re.search(r"\d+(?:\.\d+)?", raw_value)
     if not match:
-        return None
+        return raw_value  # 数値が見つからない場合は元の文字列を返す
     return float(match.group(0))
 
 
@@ -171,10 +178,16 @@ def parse_filename_labels(file_name: str) -> Dict[str, object]:
 
 
 def build_long_summary(summary_full_df: pd.DataFrame) -> pd.DataFrame:
-    dynamic_label_columns = sorted(col for col in summary_full_df.columns if col.startswith(LABEL_COLUMN_PREFIX))
-    id_columns = [col for col in LONG_SUMMARY_ID_COLUMNS if col in summary_full_df.columns]
+    dynamic_label_columns = sorted(
+        col for col in summary_full_df.columns if col.startswith(LABEL_COLUMN_PREFIX)
+    )
+    id_columns = [
+        col for col in LONG_SUMMARY_ID_COLUMNS if col in summary_full_df.columns
+    ]
     id_columns.extend(col for col in dynamic_label_columns if col not in id_columns)
-    ratio_columns = [col for col in LONG_SUMMARY_RATIO_COLUMNS if col in summary_full_df.columns]
+    ratio_columns = [
+        col for col in LONG_SUMMARY_RATIO_COLUMNS if col in summary_full_df.columns
+    ]
     if not ratio_columns:
         return pd.DataFrame(columns=id_columns + ["ratio_type", "value"])
 
@@ -203,7 +216,9 @@ def analyze_file(
     sample_name = parse_sample_name(file_path.name)
     filename_labels = parse_filename_labels(file_path.name)
     growth_value = filename_labels.get("label_growth")
-    growth_time_hour = float(growth_value) if isinstance(growth_value, (int, float)) else np.nan
+    growth_time_hour = (
+        float(growth_value) if isinstance(growth_value, (int, float)) else np.nan
+    )
 
     if enable_si_shift:
         # 1) Siピークで軸シフト補正
@@ -225,7 +240,9 @@ def analyze_file(
             method=fit_method,
         )
         if si_fit_corrected is None or si_fit_corrected.amplitude <= 0:
-            logging.warning("%s: 正規化用Siピークが取得できないためスキップ", file_path.name)
+            logging.warning(
+                "%s: 正規化用Siピークが取得できないためスキップ", file_path.name
+            )
             return None
 
         normalization_factor = si_fit_corrected.amplitude
@@ -255,7 +272,9 @@ def analyze_file(
         y_corrected = baseline_correct_asls(y_values)
         corrected_scale = float(np.max(np.abs(y_corrected)))
         if corrected_scale <= 0.0:
-            logging.warning("%s: ベースライン補正後の信号がゼロのためスキップ", file_path.name)
+            logging.warning(
+                "%s: ベースライン補正後の信号がゼロのためスキップ", file_path.name
+            )
             return None
         df_normalized = df_normalized.copy()
         df_normalized["Y"] = y_corrected / corrected_scale
@@ -283,7 +302,9 @@ def analyze_file(
             PEAK_CENTER_BOUNDS[peak_name],
             FIT_BOUNDARY_TOLERANCE_CM1[peak_name],
         )
-        peak_reliable[peak_name] = (not center_at_bound[peak_name]) and (fit.r_squared >= MIN_R2_FOR_RATIO[peak_name])
+        peak_reliable[peak_name] = (not center_at_bound[peak_name]) and (
+            fit.r_squared >= MIN_R2_FOR_RATIO[peak_name]
+        )
         if center_at_bound[peak_name]:
             logging.warning(
                 "%s: %sピークcenterが拘束境界に近いため、信頼性フラグを付与します (center=%.3f)",
@@ -312,7 +333,9 @@ def analyze_file(
 
     # 保存: 補正+正規化データ
     relative_parent = file_path.relative_to(DATA_DIR).parent
-    out_table = TABLE_DIR / relative_parent / f"{file_path.stem}_corrected_normalized.csv"
+    out_table = (
+        TABLE_DIR / relative_parent / f"{file_path.stem}_corrected_normalized.csv"
+    )
     DATA_STORE.save_dataframe(df_normalized, out_table, index=False)
 
     # 保存: 図
@@ -339,8 +362,12 @@ def analyze_file(
         "baseline_correction_enabled": ENABLE_BASELINE_CORRECTION,
         "si_center_raw_cm-1": si_fit_raw.center if si_fit_raw is not None else np.nan,
         "si_shift_correction_cm-1": shift_cm1,
-        "si_center_corrected_cm-1": si_fit_corrected.center if si_fit_corrected is not None else np.nan,
-        "si_normalization_factor": normalization_factor if si_fit_corrected is not None else np.nan,
+        "si_center_corrected_cm-1": si_fit_corrected.center
+        if si_fit_corrected is not None
+        else np.nan,
+        "si_normalization_factor": normalization_factor
+        if si_fit_corrected is not None
+        else np.nan,
         "x_filter_min_cm-1": np.nan if enable_si_shift else MIN_X_WITHOUT_SI_SHIFT,
         "D_center_cm-1": peak_fits["D"].center,
         "G_center_cm-1": peak_fits["G"].center,
@@ -389,7 +416,9 @@ def save_plot(
         y_si = build_fitted_curve(x_si, si_fit_raw)
         ax1.plot(x_si, y_si, color="tab:red", linewidth=1.5, label="Si fit")
         ax1.axvline(si_fit_raw.center, color="tab:red", linestyle="--", linewidth=1.0)
-        ax1.axvline(SI_THEORETICAL_CENTER, color="tab:green", linestyle=":", linewidth=1.0)
+        ax1.axvline(
+            SI_THEORETICAL_CENTER, color="tab:green", linestyle=":", linewidth=1.0
+        )
         si_text = f"Si raw center={si_fit_raw.center:.3f} cm^-1\nShift correction={shift_cm1:+.3f} cm^-1"
         ax1.set_title(f"{title} | Raw and Si calibration")
     else:
@@ -429,13 +458,25 @@ def save_plot(
         x_min, x_max = PEAK_WINDOWS[peak_name]
         x_fit = np.linspace(x_min, x_max, 400)
         y_fit = build_fitted_curve(x_fit, fit)
-        ax2.plot(x_fit, y_fit, color=color_map[peak_name], linewidth=1.5, label=f"{peak_name} fit")
-        ax2.axvline(fit.center, color=color_map[peak_name], linestyle="--", linewidth=1.0)
+        ax2.plot(
+            x_fit,
+            y_fit,
+            color=color_map[peak_name],
+            linewidth=1.5,
+            label=f"{peak_name} fit",
+        )
+        ax2.axvline(
+            fit.center, color=color_map[peak_name], linestyle="--", linewidth=1.0
+        )
 
     ax2.set_xlim(1000, 3000)
     ax2.set_title(f"{title} | Graphene peak fitting")
     ax2.set_xlabel(PLOT_STYLE.x_label)
-    ax2.set_ylabel("Normalized intensity (Si=1)" if si_shift_enabled else "Normalized intensity (max=1)")
+    ax2.set_ylabel(
+        "Normalized intensity (Si=1)"
+        if si_shift_enabled
+        else "Normalized intensity (max=1)"
+    )
     ax2.grid(True, alpha=0.3)
     ax2.legend(loc="upper right")
 
@@ -456,7 +497,9 @@ def main() -> None:
     records = []
     for file_path in input_files:
         logging.info("処理中: %s", file_path.name)
-        result = analyze_file(file_path, enable_si_shift=ENABLE_SI_SHIFT, fit_method=FIT_METHOD)
+        result = analyze_file(
+            file_path, enable_si_shift=ENABLE_SI_SHIFT, fit_method=FIT_METHOD
+        )
         if result is not None:
             records.append(result)
 
@@ -464,7 +507,9 @@ def main() -> None:
     summary_wide_path = OUTPUT_DIR / "summary_wide.csv"
     summary_full_path = OUTPUT_DIR / "summary_full.csv"
     summary_full_df = pd.DataFrame(records)
-    compact_columns = [col for col in COMPACT_SUMMARY_COLUMNS if col in summary_full_df.columns]
+    compact_columns = [
+        col for col in COMPACT_SUMMARY_COLUMNS if col in summary_full_df.columns
+    ]
     summary_compact_df = summary_full_df.loc[:, compact_columns]
     summary_long_df = build_long_summary(summary_full_df)
 
@@ -480,7 +525,12 @@ def main() -> None:
         )
         return
 
-    logging.info("完了: %s (long), %s (wide), %s (full)", summary_path, summary_wide_path, summary_full_path)
+    logging.info(
+        "完了: %s (long), %s (wide), %s (full)",
+        summary_path,
+        summary_wide_path,
+        summary_full_path,
+    )
 
 
 if __name__ == "__main__":

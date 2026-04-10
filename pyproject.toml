@@ -11,6 +11,11 @@ dependencies = [
     "scipy>=1.13.1",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.5.0",
+]
+
 [project.scripts]
 analyze = "spectra_analysis:main"
 plot    = "spectra_plot:main"
@@ -20,3 +25,10 @@ package = true
 
 [tool.setuptools]
 py-modules = ["spectra_analysis", "spectra_peak_fit", "spectra_plot", "spectra_common"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.format]
+quote-style = "double"

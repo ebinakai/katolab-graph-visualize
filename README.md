@@ -35,6 +35,16 @@ uv sync
 
 ---
 
+## 開発
+
+```bash
+uv sync --extra dev
+
+uv run ruff format .
+```
+
+---
+
 ## 実行
 
 ```bash

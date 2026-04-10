@@ -80,7 +80,9 @@ def fit_peak(
     sub = df.loc[mask]
 
     if len(sub) < min_points:
-        logging.warning("%s フィット失敗: データ点不足 (%d < %d)", peak_name, len(sub), min_points)
+        logging.warning(
+            "%s フィット失敗: データ点不足 (%d < %d)", peak_name, len(sub), min_points
+        )
         return None
 
     x = sub["X"].to_numpy(dtype=float)
@@ -102,7 +104,13 @@ def fit_peak(
 
     p0_candidates = [
         [amp_guess, center_guess, sigma_guess, slope_guess, intercept_guess],
-        [amp_guess_alt, center_guess_alt, sigma_guess_alt, slope_guess, intercept_guess],
+        [
+            amp_guess_alt,
+            center_guess_alt,
+            sigma_guess_alt,
+            slope_guess,
+            intercept_guess,
+        ],
     ]
     center_lower, center_upper = (x_min, x_max)
     if center_bounds is not None:
@@ -155,7 +163,9 @@ def fit_peak(
         edge_low = center_lower + center_edge_margin
         edge_high = center_upper - center_edge_margin
         if edge_low >= edge_high:
-            logging.warning("%s フィット失敗: center_edge_margin が大きすぎます", peak_name)
+            logging.warning(
+                "%s フィット失敗: center_edge_margin が大きすぎます", peak_name
+            )
             return None
         if fitted_center <= edge_low or fitted_center >= edge_high:
             logging.warning(
