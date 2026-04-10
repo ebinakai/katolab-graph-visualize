@@ -13,7 +13,7 @@ from spectra_common import PlotStyle, SpectrumDataStore, prepare_input_files
 from spectra_peak_fit import FitMethod, PeakFitResult, build_fitted_curve, fit_peak
 
 # Paths
-DATA_DIR = Path("data")
+DATA_DIR = Path("data") / "spectra_single"
 OUTPUT_DIR = Path("output") / "spectra_analysis"
 PLOT_DIR = OUTPUT_DIR / "plots"
 TABLE_DIR = OUTPUT_DIR / "tables"

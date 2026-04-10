@@ -7,7 +7,7 @@ from typing import Tuple, Optional
 from spectra_common import PlotStyle, SpectrumDataStore, prepare_input_files
 
 # Constants
-DATA_DIR = Path("data")
+DATA_DIR = Path("data") / "spectra_single"
 OUTPUT_DIR = Path("output/spectra_plot")
 X_MIN = 1000
 X_MAX = 3000
