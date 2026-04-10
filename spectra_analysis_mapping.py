@@ -87,24 +87,6 @@ def correct_wavenumber_shift(
     si_range=(500, 540),
     target=520.7,
 ):
-    """
-    Siピークを基準に波数シフト補正
-
-    Parameters
-    ----------
-    wavenumber : (N_wn,)
-    spectra    : (N_pixel, N_wn)
-    si_range   : tuple
-        Siピーク探索範囲
-    target     : float
-        目標ピーク位置（520.7）
-
-    Returns
-    -------
-    spectra_corrected : (N_pixel, N_wn)
-    shifts            : (N_pixel,)
-    """
-
     spectra = np.atleast_2d(spectra)
     N_pixel, N_wn = spectra.shape
 
@@ -217,25 +199,6 @@ def smooth_spectra(spectra, window=11, poly=3):
 
 
 def create_ig_mask(IG, threshold=None, method="absolute", ratio=0.1):
-    """
-    IGベースのマスクを生成
-
-    Parameters
-    ----------
-    IG : (N_pixel,)
-        Gピーク強度
-    method : str
-        "absolute" or "relative"
-    threshold : float or None
-        絶対閾値（method="absolute" の場合使用）
-    ratio : float
-        最大値に対する割合（method="relative" の場合使用）
-
-    Returns
-    -------
-    mask : (N_pixel,) bool
-    """
-
     if method == "absolute":
         if threshold is None:
             raise ValueError("threshold must be specified for absolute mode")
@@ -252,9 +215,6 @@ def create_ig_mask(IG, threshold=None, method="absolute", ratio=0.1):
 
 
 def apply_mask(data, mask):
-    """
-    無効ピクセルをNaNにする
-    """
     data = data.copy()
     data[~mask] = np.nan
     return data
@@ -314,7 +274,7 @@ def spectra_draw(
         # --- メインスペクトル ---
         plt.plot(wn, spec, alpha=0.9, label="spectra")
 
-        # --- 比較用（任意） ---
+        # --- 比較用 ---
         if spectra_ref is not None:
             spec_ref = spectra_ref[i, mask]
             plt.plot(wn, spec_ref, alpha=0.5, label="reference")
@@ -362,8 +322,7 @@ def analyze_spectra(filepath: Path):
 
     x, y, wavenumber, spectra = load_mapping_ascii(filepath)
 
-    def run_stage(name, process_func, *args, **kwargs):
-        nonlocal spectra
+    def run_stage(spectra, name, process_func, *args, **kwargs):
         spectra_before = spectra.copy()
         spectra = process_func(spectra, *args, **kwargs)
 
@@ -374,12 +333,11 @@ def analyze_spectra(filepath: Path):
             output_dir=debug_path,
             output_prefix=name,
         )
+        return spectra
 
-    # --- シフト ---
     spectra, shifts = correct_wavenumber_shift(wavenumber, spectra)
-
-    run_stage("baseline", preprocess_baseline)
-    # run_stage("smoothed", smooth_spectra, window=11, poly=3)
+    spectra = run_stage(spectra, "baseline", preprocess_baseline)
+    # spectra = run_stage(spectra, "smoothed", smooth_spectra, window=11, poly=3)
 
     # -- 比計算 ---
     ratio_2dg, I2D, IG = calc_2d_g_ratio(wavenumber, spectra)
