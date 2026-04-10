@@ -13,6 +13,7 @@
 | `spectra_common.py` | I/O ユーティリティ（`SpectrumDataStore`・`PlotStyle`） |
 | `spectra_peak_fit.py` | フィッティングモデルとアルゴリズム |
 | `spectra_analysis.py` | ラマン分光データの解析オーケストレーション・エントリポイント |
+| `spectra_analysis_single.py` | 単一スペクトル向けの段階的パイプライン解析 |
 | `spectra_plot.py` | 汎用スペクトル可視化スクリプト |
 
 ---
@@ -49,7 +50,37 @@ uv run ruff format .
 
 ```bash
 uv run analyze   # ラマン分光解析
+uv run analyze-single  # 単一スペクトルの簡易パイプライン解析
 uv run plot      # 汎用スペクトルプロット
+```
+
+---
+
+## `analyze-single` — 単一スペクトルの簡易パイプライン解析
+
+[`spectra_analysis_mapping.py`](/Users/kaiebina/src/github.com/ebinakai/katolab-graph-visualize/spectra_analysis_mapping.py) に近い構成で、1本のスペクトルを段階的に前処理します。
+
+### 処理フロー
+
+1. データ読込（2列: `X` cm⁻¹, `Y` 強度）
+2. `X > 0` の有効領域だけを残す
+3. Si 範囲（既定 `500-540 cm^-1`）の最大位置で X 軸をシフト補正
+4. ALS によるベースライン補正
+5. 必要なら Savitzky-Golay 平滑化
+6. 2通りで正規化
+   - Si ピーク強度で正規化
+   - `1000-3000 cm^-1` の最大強度で正規化
+7. D / G / 2D 範囲の簡易ピーク位置・強度・比を表で保存
+
+### 出力
+
+`output/spectra_analysis_single/` 以下に生成されます。
+
+```bash
+output/spectra_analysis_single/
+  ├─ summary.csv
+  ├─ plots/.../*_pipeline.png
+  └─ tables/.../*_processed.csv
 ```
 
 ---

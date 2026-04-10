@@ -19,12 +19,13 @@ dev = [
 [project.scripts]
 analyze = "spectra_analysis:main"
 plot    = "spectra_plot:main"
+analyze-single = "spectra_analysis_single:main"
 
 [tool.uv]
 package = true
 
 [tool.setuptools]
-py-modules = ["spectra_analysis", "spectra_peak_fit", "spectra_plot", "spectra_common"]
+py-modules = ["spectra_analysis", "spectra_analysis_single", "spectra_peak_fit", "spectra_plot", "spectra_common"]
 
 [tool.ruff]
 line-length = 88
