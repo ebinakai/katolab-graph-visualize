@@ -281,13 +281,13 @@ def spectra_draw(
 
         # --- 範囲表示 ---
         if g_range is not None:
-            plt.axvspan(*g_range, alpha=0.2, label="G range")
+            plt.axvspan(*g_range, alpha=0.2)
 
         if d_range is not None:
-            plt.axvspan(*d_range, alpha=0.2, label="D range")
+            plt.axvspan(*d_range, alpha=0.2)
 
         if two_d_range is not None:
-            plt.axvspan(*two_d_range, alpha=0.2, label="2D range")
+            plt.axvspan(*two_d_range, alpha=0.2)
 
         # --- ピーク位置 ---
         if show_peak:
