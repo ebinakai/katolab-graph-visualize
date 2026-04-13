@@ -147,7 +147,9 @@ def apply_si_shift(df: pd.DataFrame, si_range=SI_PEAK_RANGE, target=SI_TARGET):
 
 def subtract_baseline(df: pd.DataFrame):
     corrected = df.copy()
-    baseline = np.asarray(baseline_als(corrected["Y"].to_numpy(dtype=float)), dtype=float)
+    baseline = np.asarray(
+        baseline_als(corrected["Y"].to_numpy(dtype=float)), dtype=float
+    )
     corrected_y = corrected["Y"].to_numpy(dtype=float) - baseline
     corrected["Y"] = pd.Series(corrected_y, index=corrected.index, dtype=float)
     corrected["baseline"] = pd.Series(baseline, index=corrected.index, dtype=float)

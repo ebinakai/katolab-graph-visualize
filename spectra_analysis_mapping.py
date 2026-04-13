@@ -231,8 +231,18 @@ def save_ratio_map_figure(
     vmax=2.0,
 ):
     filepath.parent.mkdir(parents=True, exist_ok=True)
+    x = np.unique(x)
+    y = np.unique(y)
 
-    plt.scatter(x, y, c=ratio, cmap=cmap, vmin=vmin, vmax=vmax)
+    try:
+        Z = ratio.reshape(len(y), len(x))
+    except ValueError:
+        logger.warning("Data size mismatch. Checking data...")
+        Z = ratio
+
+    Z_masked = np.ma.masked_invalid(Z)
+    ratio = np.ma.masked_invalid(Z_masked)
+    plt.pcolormesh(x, y, ratio, cmap=cmap, vmin=vmin, vmax=vmax, shading="auto")
     plt.colorbar(label=title)
     plt.xlabel("X")
     plt.ylabel("Y")
