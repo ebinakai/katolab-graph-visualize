@@ -2,212 +2,94 @@
 
 ## 概要
 
-実験・測定で得られた数値データ（テキストファイル）から、ラマン分光スペクトルのグラフ作成・ピーク解析を自動化する Python スクリプト群です。
+実験・測定で得られた数値データ（テキストファイル）から、分光スペクトルのグラフ作成・ピーク解析を行うツール群です。
+従来のスクリプトベースの構成から、柔軟な解析と可視化が可能な **Jupyter Notebook** ベースの構成に移行しました。
 
 ---
 
-## モジュール構成
+## 解析ノートブック
 
 | ファイル | 役割 |
 | --- | --- |
-| `spectra_common.py` | I/O ユーティリティ（`SpectrumDataStore`・`PlotStyle`） |
-| `spectra_peak_fit.py` | フィッティングモデルとアルゴリズム |
-| `spectra_analysis.py` | ラマン分光データの解析オーケストレーション・エントリポイント |
-| `spectra_analysis_single.py` | 単一スペクトル向けの段階的パイプライン解析 |
-| `spectra_plot.py` | 汎用スペクトル可視化スクリプト |
+| `raman.ipynb` | **ラマン分光マッピング解析**<br>多点観測データ (.txt) の読込、ベースライン補正 (ALS)、ピークフィッティング、マッピング可視化。 |
+| `pl.ipynb` | **PL (Photoluminescence) 解析**<br>単点スペクトルおよびマッピングデータの解析。Voigt 関数を用いた精密なピークフィッティングに対応。 |
+| `graphen.ipynb` | **グラフェン品質評価・比較**<br>解析済みデータ (summary.csv) を集計し、2D/G比やG/D比の統計的比較（ヒストグラム、相関図）を実行。 |
+
+---
+
+## 補助スクリプト
+
+| ファイル | 役割 |
+| --- | --- |
+| `spectra_analysis_single.py` | 単一スペクトル向けの段階的パイプライン解析エントリポイント。 |
 
 ---
 
 ## セットアップ
 
+本プロジェクトは [uv](https://github.com/astral-sh/uv) を使用してパッケージ管理を行っています。
+
 ```bash
 uv sync
 ```
 
-`data/` ディレクトリを作成し、解析対象の `.txt` ファイルを配置してください（2列: X, Y）。
+---
+
+## 実行方法
+
+### 1. ノートブックによる解析
+
+Jupyter Lab を起動して、各 `.ipynb` ファイルを実行します。
 
 ```bash
-(プロジェクトルート)/
-  ├─ data/
-  │   ├─ sample1.txt
-  │   └─ sample2.txt
-  └─ ...
+uv run jupyter lab
 ```
 
----
-
-## 開発
+### 2. 単一スペクトル解析（CLI）
 
 ```bash
-uv sync --extra dev
-
-uv run ruff format .
+uv run spectra_analysis_single.py
 ```
 
 ---
 
-## 実行
+## データ構造
 
-```bash
-uv run analyze   # ラマン分光解析
-uv run analyze-single  # 単一スペクトルの簡易パイプライン解析
-uv run plot      # 汎用スペクトルプロット
+`data/` ディレクトリに、解析対象のテキストファイルを配置します。
+
+```text
+data/
+  ├─ spectra_mapping/   # マッピングデータ (Raman 等)
+  ├─ pl/                # PL データ
+  └─ spectra_single/    # 単一スペクトルデータ
 ```
 
 ---
 
-## `analyze-single` — 単一スペクトルの簡易パイプライン解析
+## 解析フロー (Raman/PL Mapping)
 
-[`spectra_analysis_mapping.py`](/Users/kaiebina/src/github.com/ebinakai/katolab-graph-visualize/spectra_analysis_mapping.py) に近い構成で、1本のスペクトルを段階的に前処理します。
-
-### 処理フロー
-
-1. データ読込（2列: `X` cm⁻¹, `Y` 強度）
-2. `X > 0` の有効領域だけを残す
-3. Si 範囲（既定 `500-540 cm^-1`）の最大位置で X 軸をシフト補正
-4. ALS によるベースライン補正
-5. 必要なら Savitzky-Golay 平滑化
-6. 2通りで正規化
-   - Si ピーク強度で正規化
-   - `1000-3000 cm^-1` の最大強度で正規化
-7. D / G / 2D 範囲の簡易ピーク位置・強度・比を表で保存
-
-### 出力
-
-`output/spectra_analysis_single/` 以下に生成されます。
-
-```bash
-output/spectra_analysis_single/
-  ├─ summary.csv
-  ├─ plots/.../*_pipeline.png
-  └─ tables/.../*_processed.csv
-```
+1. **データ読込**: ASCII 形式等のテキストデータから波長・座標・強度を抽出。
+2. **前処理**: 
+   - **ALS (Asymmetric Least Squares)** によるベースライン補正。
+   - Savitzky-Golay フィルタによる平滑化。
+3. **ピークフィッティング**:
+   - `lmfit` を使用した Lorentzian/Gaussian/Voigt 関数による最適化。
+   - D, G, 2D 等の主要ピークの強度・中心位置・半値幅を算出。
+4. **可視化**:
+   - 2D 強度マップの生成。
+   - フィッティング結果のデバッグ用プロット。
+5. **統計解析 (`graphen.ipynb`)**:
+   - 複数サンプル間での品質（2D/G 比等）の比較。
 
 ---
 
-## `analyze` — ラマン分光解析
+## 出力
 
-### 処理フロー
+`output/` ディレクトリ以下に、解析結果の画像および CSV が生成されます。
 
-各 `data/**/*.txt` に対して以下を実行します。
-
-1. データ読込（2列: `X` cm⁻¹, `Y` 強度）
-2. **Si シフト補正**（`ENABLE_SI_SHIFT = True` のとき）  
-   Si ピーク（`480–560 cm⁻¹`）をフィットし、理論値 `520.8 cm⁻¹` との差分で X 軸を補正  
-   → 補正後 Si ピーク振幅を `1` に正規化
-3. **Si 補正なし**（`ENABLE_SI_SHIFT = False` のとき）  
-   `X > 500 cm⁻¹` の範囲を最大値で正規化
-4. `D`・`G`・`2D` ピークをフィット
-5. 強度比 `I_D/I_G`・`I_2D/I_G`・`I_D/I_2D` を計算
-
-### フィッティングモデル
-
-`spectra_analysis.py` 冒頭の `FIT_METHOD` で手法を切り替えられます。
-
-```python
-FIT_METHOD = FitMethod.GAUSSIAN      # ガウスフィッティング（デフォルト）
-FIT_METHOD = FitMethod.LORENTZIAN    # ローレンツフィッティング
-```
-
-| 手法 | 関数 | ピーク面積 |
-| --- | --- | --- |
-| Gaussian | `A·exp(-(x-μ)²/(2σ²)) + m·x + b` | `A·σ·√(2π)` |
-| Lorentzian | `A·γ²/((x-μ)²+γ²) + m·x + b` | `A·γ·π` |
-
-### ピーク窓（cm⁻¹）
-
-| ピーク | 範囲 |
-| --- | --- |
-| Si | 480–560 |
-| D | 1250–1450 |
-| G | 1500–1650 |
-| 2D | 2600–2800 |
-
-### 出力
-
-`output/spectra_analysis/` 以下に生成されます。
-
-```bash
-output/spectra_analysis/
-  ├─ summary.csv                        # 全ファイルの解析結果一覧
-  ├─ tables/.../*_corrected_normalized.csv  # 入力フォルダ構造を維持して保存
-  └─ plots/.../*_analysis.png               # 入力フォルダ構造を維持して保存
-```
-
-#### `summary.csv` の主な列
-
-| 列名 | 内容 |
-| --- | --- |
-| `relative_path` | `data/` 配下の相対パス |
-| `label_xxx` | ファイル名中の `XXX-YYY` 形式を抽出した動的列。値は数値部分のみ保持。例: `anneal-1h` → `label_anneal=1`, `position-645mm` → `label_position=645` |
-| `fit_method` | 使用したフィッティング手法 |
-| `si_shift_enabled` | Si シフト補正の有無 |
-| `si_center_raw_cm-1` | 補正前 Si ピーク中心 |
-| `si_shift_correction_cm-1` | 適用した補正量 |
-| `D_amplitude_norm` / `G_amplitude_norm` / `2D_amplitude_norm` | 正規化後ピーク振幅 |
-| `I_D/I_G` / `I_2D/I_G` / `I_D/I_2D` | 強度比 |
-| `R2_D` / `R2_G` / `R2_2D` | 各フィットの決定係数 R² |
-
----
-
-## `plot` — 汎用スペクトルプロット
-
-各スペクトルを 1 枚の PNG として保存するシンプルなプロッタです。  
-フィッティングは行いません。
-
-`spectra_plot.py` 冒頭の定数で表示範囲を変更できます。
-
-```python
-X_MIN = 1000   # X 軸最小値 (cm⁻¹)
-X_MAX = 3000   # X 軸最大値 (cm⁻¹)
-```
-
-出力先: `output/spectra_plot/`
-
----
-
-## スペクトルマッピング解析
-
-単一スペクトルではなく、多点（2Dマッピング）データに対して前処理・ピーク比評価・可視化を行う機能を追加しています。
-
-### 処理パイプライン
-
-1. ベースライン補正（ALS法）
-2. スムージング（Savitzky-Golay）
-3. ピーク強度抽出（max / top-N平均）
-4. ピーク比計算（例: I_D/I_G, I_2D/I_G）
-5. 外れ値除去・可視化レンジ調整
-6. マッピング可視化
-
----
-
-### ベースライン補正（ALS）
-
-非対称最小二乗法（Asymmetric Least Squares）により背景を推定し除去：
-
-- なだらかなバックグラウンドを分離
-- ピーク構造を保持
-
----
-
-### スムージング
-
-Savitzky-Golayフィルタを使用：
-
-- ノイズ低減
-- ピーク位置の安定化
-
-※ 注意：
-
-- ピーク強度は変化するため、定量評価には影響あり
-
----
-
-### ピーク強度抽出
-
-ピーク範囲内の強度は以下の方法で取得可能：
-
-```python
-method="max"    # 最大値
-method="topn"   # 上位n点の平均（デフォルト）
+```text
+output/
+  ├─ spectra_mapping/   # マッピング結果 (2D Map, quantitative_results.csv)
+  ├─ pl/                # PL 解析結果
+  └─ spectra_analysis/  # 単一スペクトル解析結果
 ```
