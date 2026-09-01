@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 def configure_publication_style():
     """Matplotlibのプロットスタイルを論文用（セリフ系・高解像度）に設定する"""
     plt.rcParams['font.family'] = 'Times New Roman'  # セリフ系
-    plt.rcParams['font.size'] = 10                  # 学会用標準サイズ
+    plt.rcParams['font.size'] = 14                  # 学会用標準サイズ（拡大）
     plt.rcParams['axes.linewidth'] = 1.0            # 軸の太さ
     plt.rcParams['xtick.direction'] = 'in'          # 目盛り内向き
     plt.rcParams['ytick.direction'] = 'in'
@@ -43,7 +43,7 @@ def plot_raman_spectrum(csv_path: Path, output_dir: Path, xlim: list | None = No
     # フォーマット: {列名: (色, 線幅, 線種, 凡例ラベル)}
     allowed_cols = {
         'Processed_Intensity': ('#000000', 1.0, '-', 'Experiment'),
-        # 'Fit_Curve': ('#0f172a', 1.5, '-', 'Fit')
+        # 'Fit_Curve': ('#d55e00', 1.2, '-', 'Fit')
     }
     
     # 3. 指定した表示対象の列のみをプロット（生データなどは非表示にする）
@@ -76,15 +76,15 @@ def plot_raman_spectrum(csv_path: Path, output_dir: Path, xlim: list | None = No
     
     # 凡例の設定（枠なし）
     if len(allowed_cols) > 1:
-        ax.legend(frameon=False, loc='upper left')
+        ax.legend(frameon=False, loc='upper right')
     
     # 保存処理
     output_dir.mkdir(parents=True, exist_ok=True)
     pdf_output = output_dir / f"{csv_path.stem}_plot.pdf"
     png_output = output_dir / f"{csv_path.stem}_plot.png"
     
-    plt.savefig(pdf_output, format='pdf', bbox_inches='tight')
-    plt.savefig(png_output, format='png', dpi=300, bbox_inches='tight')
+    plt.savefig(pdf_output, format='pdf', bbox_inches='tight', transparent=True)
+    # plt.savefig(png_output, format='png', dpi=300, bbox_inches='tight', transparent=True)
     
     print(f"Plot generated (xlim={xlim}):\n - {pdf_output}\n - {png_output}")
 
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--input", 
         type=str, 
-        default="output/spectra_mapping/S7/representative_spectrum_49.csv",
+        default="output/spectra_mapping/S7/representative_spectrum_15.csv",
         help="Path to the processed spectrum CSV file."
     )
     parser.add_argument(
