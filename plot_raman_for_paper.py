@@ -86,7 +86,8 @@ def plot_raman_spectrum(csv_path: Path, output_dir: Path, xlim: list | None = No
     plt.savefig(pdf_output, format='pdf', bbox_inches='tight', transparent=True)
     # plt.savefig(png_output, format='png', dpi=300, bbox_inches='tight', transparent=True)
     
-    print(f"Plot generated (xlim={xlim}):\n - {pdf_output}\n - {png_output}")
+    # print(f"Plot generated (xlim={xlim}):\n - {pdf_output}\n - {png_output}")
+    print(f"Plot generated (xlim={xlim}):\n - {pdf_output}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot Raman spectrum with specific columns and xlim.")
